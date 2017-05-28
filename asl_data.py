@@ -275,11 +275,14 @@ def combine_sequences(sequences):
     '''
     sequence_cat = []
     sequence_lengths = []
-    # print("num of sequences in {} = {}".format(key, len(sequences)))
+
+#    print("--- sequences {} {}".format(sequences, len(sequences)))
     for sequence in sequences:
+ #       print("sequence {}".format(sequence))
         sequence_cat += sequence
         num_frames = len(sequence)
         sequence_lengths.append(num_frames)
+  #  print("About to return {}, {}".format(sequence_cat, sequence_lengths))
     return sequence_cat, sequence_lengths
 
 def create_hmmlearn_data(dict):
