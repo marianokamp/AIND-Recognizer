@@ -98,11 +98,48 @@ class SelectorDIC(ModelSelector):
 
 class SelectorCV(ModelSelector):
     ''' select best model based on average log Likelihood of cross-validation folds
-
+train_a_word(my_testword, 3, features_custom)
     '''
 
     def select(self):
         warnings.filterwarnings("ignore", category=DeprecationWarning)
+        
+        features = ['polar-lr-norm', 'polar-rr-norm', 'polar-ltheta-norm', 'polar-rtheta-norm']
+        split_method = KFold(n_splits=min(3, len(self.lengths)))
+        
+        results = [] # (n, score)
+        
+        for n in range(self.min_n_components, self.max_n_components+1):
+            #print("self.sequences=", len(self.sequences))
+            #print ("n={}".format(n))
+            
+            cv_scores = []
 
-        # TODO implement model selection using CV
-        raise NotImplementedError
+            for cv_train_idx, cv_test_idx in split_method.split(self.sequences):
+                #print("inner loop", self.transmat_.sum(axis=1), 1.0)
+                try:
+                    X_train, lengths_train = combine_sequences(cv_train_idx, self.sequences)
+                    #print("train", X_train, lengths_train)
+                    X_test, lengths_test = combine_sequences(cv_test_idx, self.sequences)
+                    #print("test", X_test, lengths_test)
+            
+                    #model = self.base_model(n).fit(X_train, lengths_train)
+                    model = self.base_model(n).fit(X_train, lengths_train)
+                    score = model.score(X_test, lengths_test)
+                    cv_scores.append(score)
+                    
+                except:
+                    pass
+                    #print("oops")
+            results.append((n, np.mean(cv_scores))) 
+        print("results", results)
+        
+        best_score = -math.inf
+        best_n = -math.inf
+
+        for result in results:
+            if result[1] > best_score:
+                best_n, best_score = result
+        print("best_n", best_n, "best_score", best_score)
+
+        return self.base_model(best_n)
