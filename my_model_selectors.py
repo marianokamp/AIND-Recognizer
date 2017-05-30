@@ -46,6 +46,12 @@ class ModelSelector(object):
                 print("failure on {} with {} states".format(self.this_word, num_states))
             return None
 
+    def pick_best(self, results):
+        print("results", results)
+        assert(len(results) > 0)
+        best_n = sorted(results, key=lambda t: -t[1])[0][0] # best result, n column
+        print("best_n", best_n)
+        return best_n
 
 class SelectorConstant(ModelSelector):
     """ select the model with value self.n_constant
@@ -76,9 +82,23 @@ class SelectorBIC(ModelSelector):
         """
         warnings.filterwarnings("ignore", category=DeprecationWarning)
 
-        # TODO implement model selection based on BIC scores
-        raise NotImplementedError
+        results = [] # (n, score)
+       
+        for n in range(self.min_n_components, self.max_n_components+1):
+       
+            print("n=", n, "X", len(self.X), "lengths=", self.lengths)
+            logL = self.base_model(n).score(self.X, self.lengths)
+            dimension_count = self.X.shape[0]
+            parameter_count = n ** 2 + (dimension_count * 2 * n) -1
+            N = len(self.X)
+            #print("dimension_count", dimension_count)
+            #print("parameter_count", parameter_count)
 
+            bic = -2 * logL + parameter_count * np.log(N)
+            print("bic, logL, n, N, parameter_count", bic, logL, n, N, parameter_count)
+            results.append((n, bic))     
+
+        return self.base_model(self.pick_best(results))
 
 class SelectorDIC(ModelSelector):
     ''' select best model based on Discriminative Information Criterion
@@ -91,21 +111,56 @@ class SelectorDIC(ModelSelector):
 
     def select(self):
         warnings.filterwarnings("ignore", category=DeprecationWarning)
+   
+        # main objective is to find out how different values of n, number of
+        # states, affect the logL.
+        # Will iterate over all ns and then compare the logL for this specific
+        # word with this specific n to the logL of all other words with the
+        # same n.
+        # The n which yields the highest logL will be returned.
 
-        # TODO implement model selection based on DIC scores
-        raise NotImplementedError
+        results = [] # (n, score)        
+        print(self.this_word)
 
+        for n in range(self.min_n_components, self.max_n_components+1):
+            
+            model = self.base_model(n)
+
+            this_word_score    = None
+            other_words_scores = [] 
+
+            for word in self.words:
+
+                try:
+                    X_train, lengths_train = self.hwords[word]
+
+                    score = model.score(X_train, lengths_train)
+                    
+                    if word == self.this_word:
+                        assert(not this_word_score)
+                        this_word_score = score
+                    else:
+                        other_words_scores.append(score)
+                except:
+                    #print("Oops")
+                    pass
+            
+            if this_word_score or other_words_scores:
+                mean_other_words_scores = np.mean(other_words_scores)
+                results.append((n, max(mean_other_words_scores, this_word_score)))
+                print(mean_other_words_scores, this_word_score)
+
+        return self.base_model(self.pick_best(results))
 
 class SelectorCV(ModelSelector):
     ''' select best model based on average log Likelihood of cross-validation folds
-train_a_word(my_testword, 3, features_custom)
     '''
 
     def select(self):
         warnings.filterwarnings("ignore", category=DeprecationWarning)
-        
+
         features = ['polar-lr-norm', 'polar-rr-norm', 'polar-ltheta-norm', 'polar-rtheta-norm']
-        split_method = KFold(n_splits=min(3, len(self.lengths)))
+        split_method = KFold(n_splits=min(2, len(self.lengths)))
         
         results = [] # (n, score)
         
@@ -116,14 +171,10 @@ train_a_word(my_testword, 3, features_custom)
             cv_scores = []
 
             for cv_train_idx, cv_test_idx in split_method.split(self.sequences):
-                #print("inner loop", self.transmat_.sum(axis=1), 1.0)
                 try:
                     X_train, lengths_train = combine_sequences(cv_train_idx, self.sequences)
-                    #print("train", X_train, lengths_train)
                     X_test, lengths_test = combine_sequences(cv_test_idx, self.sequences)
-                    #print("test", X_test, lengths_test)
             
-                    #model = self.base_model(n).fit(X_train, lengths_train)
                     model = self.base_model(n).fit(X_train, lengths_train)
                     score = model.score(X_test, lengths_test)
                     cv_scores.append(score)
@@ -143,3 +194,9 @@ train_a_word(my_testword, 3, features_custom)
         print("best_n", best_n, "best_score", best_score)
 
         return self.base_model(best_n)
+
+if __name__ == '__main__':
+    import unittest
+    from asl_test_model_selectors import TestSelectors
+    suite = unittest.TestLoader().loadTestsFromModule(TestSelectors())
+    unittest.TextTestRunner().run(suite)
