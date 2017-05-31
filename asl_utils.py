@@ -27,15 +27,16 @@ def show_errors(guesses: list, test_set: SinglesData):
 
     print("\n**** WER = {}".format(float(S) / float(N)))
     print("Total correct: {} out of {}".format(N - S, N))
-    print('Video  Recognized                                                    Correct')
-    print('=====================================================================================================')
-    for video_num in test_set.sentences_index:
-        correct_sentence = [test_set.wordlist[i] for i in test_set.sentences_index[video_num]]
-        recognized_sentence = [guesses[i] for i in test_set.sentences_index[video_num]]
-        for i in range(len(recognized_sentence)):
-            if recognized_sentence[i] != correct_sentence[i]:
-                recognized_sentence[i] = '*' + recognized_sentence[i]
-        print('{:5}: {:60}  {}'.format(video_num, ' '.join(recognized_sentence), ' '.join(correct_sentence)))
+    if False: 
+        print('Video  Recognized                                                    Correct')
+        print('=====================================================================================================')
+        for video_num in test_set.sentences_index:
+            correct_sentence = [test_set.wordlist[i] for i in test_set.sentences_index[video_num]]
+            recognized_sentence = [guesses[i] for i in test_set.sentences_index[video_num]]
+            for i in range(len(recognized_sentence)):
+                if recognized_sentence[i] != correct_sentence[i]:
+                    recognized_sentence[i] = '*' + recognized_sentence[i]
+            print('{:5}: {:60}  {}'.format(video_num, ' '.join(recognized_sentence), ' '.join(correct_sentence)))
 
 
 def getKey(item):

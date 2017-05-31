@@ -47,12 +47,16 @@ class ModelSelector(object):
             return None
 
     def pick_best(self, results):
-        print("results", results)
-        assert(len(results) > 0)
-        best_n = sorted(results, key=lambda t: -t[1])[0][0] # best result, n column
-        print("best_n", best_n)
-        return best_n
+        if not results:
+            return self.n_constant
 
+        best_n, best_score = sorted(results, key=lambda t: -t[1])[0] # best result, n column
+        
+        if best_score > -math.inf:
+            return best_n
+        else:
+            return self.n_constant
+    
 class SelectorConstant(ModelSelector):
     """ select the model with value self.n_constant
 
@@ -83,22 +87,35 @@ class SelectorBIC(ModelSelector):
         warnings.filterwarnings("ignore", category=DeprecationWarning)
 
         results = [] # (n, score)
-       
+        row_count, dimension_count = self.X.shape
+        #print(row_count, dimension_count)
+               
         for n in range(self.min_n_components, self.max_n_components+1):
        
-            print("n=", n, "X", len(self.X), "lengths=", self.lengths)
-            logL = self.base_model(n).score(self.X, self.lengths)
-            dimension_count = self.X.shape[0]
-            parameter_count = n ** 2 + (dimension_count * 2 * n) -1
-            N = len(self.X)
-            #print("dimension_count", dimension_count)
-            #print("parameter_count", parameter_count)
+            try:
 
-            bic = -2 * logL + parameter_count * np.log(N)
-            print("bic, logL, n, N, parameter_count", bic, logL, n, N, parameter_count)
-            results.append((n, bic))     
+                model = self.base_model(n)
+
+                #print(model.transmat_)
+                #print(model.transmat_.shape)
+                logL = model.score(self.X, self.lengths)
+                print("equal?", (model.transmat_.shape[0] == model.transmat._shape[1])) 
+                # states from*(to-inital)
+                state_p = model.transmat_.shape[0] * (model.transmat_.shape[1] - 1)
+                # for each state there are two probabilities: to stay in the current state or two move on
+                state_out = n * self.X.shape[1] * 2
+                total_p_count = state_p + state_out + (n - 1)
+                
+                #total_p_count = dimension_count**2
+                bic = -2 * logL + (total_p_count * np.log(row_count))
+                
+                #print("bic, logL, n, N, parameter_count", bic, logL, n, row_count, total_p_count)
+                results.append((n, bic))     
+            except:
+                results.append((n, -math.inf))
 
         return self.base_model(self.pick_best(results))
+        
 
 class SelectorDIC(ModelSelector):
     ''' select best model based on Discriminative Information Criterion
@@ -120,7 +137,6 @@ class SelectorDIC(ModelSelector):
         # The n which yields the highest logL will be returned.
 
         results = [] # (n, score)        
-        print(self.this_word)
 
         for n in range(self.min_n_components, self.max_n_components+1):
             
@@ -142,13 +158,11 @@ class SelectorDIC(ModelSelector):
                     else:
                         other_words_scores.append(score)
                 except:
-                    #print("Oops")
                     pass
             
             if this_word_score or other_words_scores:
                 mean_other_words_scores = np.mean(other_words_scores)
                 results.append((n, max(mean_other_words_scores, this_word_score)))
-                print(mean_other_words_scores, this_word_score)
 
         return self.base_model(self.pick_best(results))
 
@@ -159,41 +173,42 @@ class SelectorCV(ModelSelector):
     def select(self):
         warnings.filterwarnings("ignore", category=DeprecationWarning)
 
-        features = ['polar-lr-norm', 'polar-rr-norm', 'polar-ltheta-norm', 'polar-rtheta-norm']
+        # enough training data? otherwise short circuit here
+        if len(self.lengths) < 3:
+            return self.base_model(self.n_constant)
+
         split_method = KFold(n_splits=min(2, len(self.lengths)))
         
         results = [] # (n, score)
         
         for n in range(self.min_n_components, self.max_n_components+1):
-            #print("self.sequences=", len(self.sequences))
-            #print ("n={}".format(n))
             
             cv_scores = []
 
             for cv_train_idx, cv_test_idx in split_method.split(self.sequences):
-                try:
-                    X_train, lengths_train = combine_sequences(cv_train_idx, self.sequences)
-                    X_test, lengths_test = combine_sequences(cv_test_idx, self.sequences)
+                X_train, lengths_train = combine_sequences(cv_train_idx, self.sequences)
+                X_test, lengths_test = combine_sequences(cv_test_idx, self.sequences)
             
+                try:
                     model = self.base_model(n).fit(X_train, lengths_train)
                     score = model.score(X_test, lengths_test)
                     cv_scores.append(score)
                     
                 except:
                     pass
-                    #print("oops")
-            results.append((n, np.mean(cv_scores))) 
-        print("results", results)
+            
+            overall_score = np.mean(cv_scores) if cv_scores else -math.inf
+            results.append((n, overall_score)) 
         
-        best_score = -math.inf
-        best_n = -math.inf
+        #best_score = -math.inf
+        #best_n = -math.inf
 
-        for result in results:
-            if result[1] > best_score:
-                best_n, best_score = result
-        print("best_n", best_n, "best_score", best_score)
+        #for result in results:
+        #    if result[1] > best_score:
+        #        best_n, best_score = result
+        #print("best_n", best_n, "best_score", best_score)
 
-        return self.base_model(best_n)
+        return self.base_model(self.pick_best(results))
 
 if __name__ == '__main__':
     import unittest

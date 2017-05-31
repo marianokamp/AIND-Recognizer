@@ -1,6 +1,8 @@
 import warnings
 from asl_data import SinglesData
+import math
 
+#from asl_test_recognizer import TestRecognize
 
 def recognize(models: dict, test_set: SinglesData):
     """ Recognize test word sequences from word models set
@@ -20,6 +22,28 @@ def recognize(models: dict, test_set: SinglesData):
     warnings.filterwarnings("ignore", category=DeprecationWarning)
     probabilities = []
     guesses = []
-    # TODO implement the recognizer
-    # return probabilities, guesses
-    raise NotImplementedError
+    
+    for test_idx in range(test_set.num_items):
+        X_test, lengths_test = test_set.get_item_Xlengths(test_idx)
+        
+        scores = {} # word: logL
+        best_score = -math.inf
+        best_guess = None
+
+        for word, model in models.items():
+            try:
+                score = -math.inf
+                score = model.score(X_test, lenghts_test)
+                scores[word] = score
+
+            except:
+                scores[word] = -math.inf
+
+            if not best_guess or score > best_score:
+                best_score = score
+                best_guess = word
+      
+        probabilities.append(scores)
+        guesses.append(best_guess)
+    
+    return probabilities, guesses
