@@ -75,7 +75,7 @@ class SelectorBIC(ModelSelector):
     """ select the model with the lowest Baysian Information Criterion(BIC) score
 
     http://www2.imm.dtu.dk/courses/02433/doc/ch6_slides.pdf
-    Bayesian information criteria: BIC = -2 * logL + p * logN
+    Bayesian information criteria: BIC = -2 * logL + p * logN)
     """
 
     def select(self):
@@ -88,32 +88,31 @@ class SelectorBIC(ModelSelector):
 
         results = [] # (n, score)
         row_count, dimension_count = self.X.shape
-        #print(row_count, dimension_count)
-               
+        
+        count_errors = 0
+        count_records = 0
+
         for n in range(self.min_n_components, self.max_n_components+1):
-       
+            
+            count_records += 1
+
             try:
 
                 model = self.base_model(n)
-
-                #print(model.transmat_)
-                #print(model.transmat_.shape)
                 logL = model.score(self.X, self.lengths)
-                print("equal?", (model.transmat_.shape[0] == model.transmat._shape[1])) 
-                # states from*(to-inital)
-                state_p = model.transmat_.shape[0] * (model.transmat_.shape[1] - 1)
-                # for each state there are two probabilities: to stay in the current state or two move on
-                state_out = n * self.X.shape[1] * 2
-                total_p_count = state_p + state_out + (n - 1)
-                
-                #total_p_count = dimension_count**2
+
+                # approximating the number of parameters, only just for
+                # adjustment => bic
+                total_p_count = (n ** 2) * model.transmat_.shape[0]
+
                 bic = -2 * logL + (total_p_count * np.log(row_count))
                 
-                #print("bic, logL, n, N, parameter_count", bic, logL, n, row_count, total_p_count)
-                results.append((n, bic))     
+                results.append((n, bic))
             except:
+                count_errors += 1
                 results.append((n, -math.inf))
 
+        #print("errors:", 100.0*float(count_errors)/float(count_records))
         return self.base_model(self.pick_best(results))
         
 

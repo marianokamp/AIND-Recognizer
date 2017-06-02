@@ -31,9 +31,11 @@ def recognize(models: dict, test_set: SinglesData):
         best_guess = None
 
         for word, model in models.items():
+            #print("recognize word:", word, "model:", model)
             try:
                 score = -math.inf
-                score = model.score(X_test, lenghts_test)
+                score = model.score(X_test, lengths_test)
+                #print("score", score)
                 scores[word] = score
 
             except:
