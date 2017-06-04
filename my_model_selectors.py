@@ -87,32 +87,24 @@ class SelectorBIC(ModelSelector):
         warnings.filterwarnings("ignore", category=DeprecationWarning)
 
         results = [] # (n, score)
-        row_count, dimension_count = self.X.shape
+        row_count, _ = self.X.shape
         
-        count_errors = 0
-        count_records = 0
-
         for n in range(self.min_n_components, self.max_n_components+1):
             
-            count_records += 1
-
             try:
 
                 model = self.base_model(n)
                 logL = model.score(self.X, self.lengths)
-
-                # approximating the number of parameters, only just for
-                # adjustment => bic
-                total_p_count = (n ** 2) * model.transmat_.shape[0]
+                
+                # from the reviewer:
+                total_p_count = n * (n-1) + n-1 + np.mean(n*self.X[0]) + np.var(n*self.X[0]) 
 
                 bic = -2 * logL + (total_p_count * np.log(row_count))
                 
                 results.append((n, bic))
             except:
-                count_errors += 1
                 results.append((n, -math.inf))
 
-        #print("errors:", 100.0*float(count_errors)/float(count_records))
         return self.base_model(self.pick_best(results))
         
 
@@ -199,14 +191,6 @@ class SelectorCV(ModelSelector):
             overall_score = np.mean(cv_scores) if cv_scores else -math.inf
             results.append((n, overall_score)) 
         
-        #best_score = -math.inf
-        #best_n = -math.inf
-
-        #for result in results:
-        #    if result[1] > best_score:
-        #        best_n, best_score = result
-        #print("best_n", best_n, "best_score", best_score)
-
         return self.base_model(self.pick_best(results))
 
 if __name__ == '__main__':
